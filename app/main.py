@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Response, status, HTTPException
 from fastapi.params import Body
 from pydantic import BaseModel
 import psycopg2
@@ -8,7 +8,7 @@ import time
 app = FastAPI()
 
 
-class PostSchema(BaseModel):
+class Post(BaseModel):
     title: str
     content: str
     published: bool = True
@@ -39,8 +39,16 @@ def get_posts():
     return {"data": posts}
 
 
-@app.post("/posts")
-def create_posts(post: PostSchema):
-    print(post)
-    print(post.dict())
-    return {"message": "Post created successfully", "pp": post}
+@app.post("/posts", status_code=status.HTTP_201_CREATED)
+def create_posts(post: Post):
+    cursor.execute("""INSERT INTO posts (title,content,published) VALUES (%s,%s,%s) RETURNING *""",
+                   (post.title, post.content, post.published))
+
+    new_post = cursor.fetchone()
+    conn.commit()
+    return {"message": "Post created successfully", "data": new_post}
+
+@app.get("/posts/{id}")
+def get_post(id:int):
+    post = find_post(id)
+    if not post:
